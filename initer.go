@@ -11,7 +11,7 @@ import (
 	"sync/atomic"
 )
 
-var logger *log.ClassicLog
+var logger log.ClassicLog
 
 type (
 	ExitResult struct {
@@ -39,9 +39,9 @@ func RegisterUnit(name string, f InitFunc) {
 }
 
 //noinspection ALL
-func Execute(ctx context.Context, zapLoggger *zap.Logger) {
+func Execute(ctx context.Context, zapLoggger *zap.Logger, loggerOpt ...log.Opt) {
 	assert.Must(zapLoggger != nil, "no logger setup !!! ")
-	logger = log.NewTaggedClassicLogger(log.Zap(), "bootloader").With(log.UseColor(log.Black))
+	logger = log.NewTaggedClassicLogger(zapLoggger, "bootloader", loggerOpt...)
 	if len(units) == 0 {
 		logger.Debug("no service,exit...")
 		return
