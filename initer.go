@@ -6,11 +6,12 @@ import (
 	"github.com/gen-iot/std/v2"
 	"github.com/guestin/log"
 	"github.com/ooopSnake/assert.go"
+	"go.uber.org/zap"
 	"strings"
 	"sync/atomic"
 )
 
-var logger = log.NewTaggedClassicLogger(log.Zap(), "bootloader").With(log.UseColor(log.Black))
+var logger *log.ClassicLog
 
 type (
 	ExitResult struct {
@@ -38,7 +39,9 @@ func RegisterUnit(name string, f InitFunc) {
 }
 
 //noinspection ALL
-func Execute(ctx context.Context) {
+func Execute(ctx context.Context, zapLoggger *zap.Logger) {
+	assert.Must(zapLoggger != nil, "no logger setup !!! ")
+	logger = log.NewTaggedClassicLogger(log.Zap(), "bootloader").With(log.UseColor(log.Black))
 	if len(units) == 0 {
 		logger.Debug("no service,exit...")
 		return
