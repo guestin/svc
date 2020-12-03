@@ -3,8 +3,8 @@ package svc
 import (
 	"container/list"
 	"context"
-	"github.com/gen-iot/std/v2"
 	"github.com/guestin/log"
+	"github.com/guestin/mob/msync"
 	"github.com/ooopSnake/assert.go"
 	"go.uber.org/zap"
 	"strings"
@@ -47,7 +47,7 @@ func Execute(ctx context.Context, zapLoggger *zap.Logger, loggerOpt ...log.Opt) 
 		return
 	}
 	defer log.Flush()
-	group := std.NewAsyncTaskGroup()
+	group := msync.NewAsyncTaskGroup()
 	defer group.Wait()
 	taskStack := list.New()
 
