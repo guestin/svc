@@ -30,8 +30,8 @@ var units []Unit
 
 //noinspection ALL
 func RegisterUnit(name string, f InitFunc) {
-	assert.Must(len(strings.TrimSpace(name)) != 0, "name must not empty or blank")
-	assert.Must(f != nil, "func must not be nil")
+	assert.Must(len(strings.TrimSpace(name)) != 0, "name must not empty or blank").Panic()
+	assert.Must(f != nil, "func must not be nil").Panic()
 	units = append(units, Unit{
 		Name: name,
 		Func: f,
@@ -40,7 +40,7 @@ func RegisterUnit(name string, f InitFunc) {
 
 //noinspection ALL
 func Execute(ctx context.Context, zapLoggger *zap.Logger, loggerOpt ...log.Opt) {
-	assert.Must(zapLoggger != nil, "no logger setup !!! ")
+	assert.Must(zapLoggger != nil, "no logger setup !!! ").Panic()
 	logger = log.NewTaggedClassicLogger(zapLoggger, "bootloader", loggerOpt...)
 	if len(units) == 0 {
 		logger.Debug("no service,exit...")
