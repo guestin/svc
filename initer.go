@@ -60,7 +60,7 @@ func Execute(ctx context.Context, zapLoggger *zap.Logger, loggerOpt ...log.Opt) 
 		if err != nil {
 			logger.With(
 				log.UseSubTag(log.NewFixStyleText(unitItem.Name, log.Red, true))).
-				Fatal("init failed,err:", err)
+				Panic("init failed,err:", err)
 			return
 		}
 		logger.With(
@@ -102,7 +102,6 @@ func Execute(ctx context.Context, zapLoggger *zap.Logger, loggerOpt ...log.Opt) 
 		taskItem.Cancel()
 		taskItem.Wait()
 	}
-	log.Flush()
 }
 
 type task struct {
