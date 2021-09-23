@@ -50,13 +50,12 @@ func Execute(ctx context.Context, zapLoggger *zap.Logger, loggerOpt ...log.Opt) 
 	group := msync.NewAsyncTaskGroup()
 	defer group.Wait()
 	taskStack := list.New()
-
 	runner := func(unitItem Unit) {
 		defer log.Flush()
 		logger.With(
 			log.UseSubTag(log.NewFixStyleText(unitItem.Name, log.Green, true))).
 			Info("start init...")
-		task, err := taskWrapper(unitItem.Func)
+		task, err := taskWrapper(ctx, unitItem.Func)
 		if err != nil {
 			logger.With(
 				log.UseSubTag(log.NewFixStyleText(unitItem.Name, log.Red, true))).
@@ -138,8 +137,9 @@ func (this *task) Cancel() {
 }
 
 func taskWrapper(
+	ctx context.Context,
 	initFunc InitFunc) (*task, error) {
-	child, cancelFunc := context.WithCancel(context.Background())
+	child, cancelFunc := context.WithCancel(ctx)
 	originalExecFunc, err := initFunc(child)
 	if err != nil {
 		cancelFunc()
