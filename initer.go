@@ -50,6 +50,15 @@ func Execute(ctx context.Context, zapLoggger *zap.Logger, loggerOpt ...log.Opt) 
 	group := msync.NewAsyncTaskGroup()
 	defer group.Wait()
 	taskStack := list.New()
+	defer func() {
+		for taskStack.Len() != 0 {
+			item := taskStack.Front()
+			taskStack.Remove(item)
+			taskItem := item.Value.(*task)
+			taskItem.Cancel()
+			taskItem.Wait()
+		}
+	}()
 	runner := func(unitItem Unit) {
 		defer log.Flush()
 		logger.With(
@@ -94,13 +103,6 @@ func Execute(ctx context.Context, zapLoggger *zap.Logger, loggerOpt ...log.Opt) 
 		runner(units[idx])
 	}
 	<-ctx.Done()
-	for taskStack.Len() != 0 {
-		item := taskStack.Front()
-		taskStack.Remove(item)
-		taskItem := item.Value.(*task)
-		taskItem.Cancel()
-		taskItem.Wait()
-	}
 }
 
 type task struct {
