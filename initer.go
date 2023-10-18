@@ -18,18 +18,33 @@ type (
 		Code  int
 		Error error
 	}
-	ExecFunc func() ExitResult
-	InitFunc func(ctx context.Context) (ExecFunc, error)
-	Unit     struct {
+	ExecFunc  func() ExitResult
+	InitFunc  func(ctx context.Context) (ExecFunc, error)
+	InitFunc2 func(ctx context.Context, moduleName string, zlogger *zap.Logger) (ExecFunc, error)
+	Unit      struct {
 		Name string
-		Func InitFunc
+		Func InitFunc2
 	}
 )
 
+func upgradeInitFuncToV2(f InitFunc) InitFunc2 {
+	return func(ctx context.Context, moduleName string, zlogger *zap.Logger) (ExecFunc, error) {
+		return f(ctx)
+	}
+}
+
 var units []Unit
 
-//noinspection ALL
 func RegisterUnit(name string, f InitFunc) {
+	assert.Must(len(strings.TrimSpace(name)) != 0, "name must not empty or blank").Panic()
+	assert.Must(f != nil, "func must not be nil").Panic()
+	units = append(units, Unit{
+		Name: name,
+		Func: upgradeInitFuncToV2(f),
+	})
+}
+
+func RegisterUnit2(name string, f InitFunc2) {
 	assert.Must(len(strings.TrimSpace(name)) != 0, "name must not empty or blank").Panic()
 	assert.Must(f != nil, "func must not be nil").Panic()
 	units = append(units, Unit{
@@ -38,7 +53,11 @@ func RegisterUnit(name string, f InitFunc) {
 	})
 }
 
-//noinspection ALL
+func RegisterUnits(inputUnits []Unit) {
+	units = append(units, inputUnits...)
+}
+
+// noinspection ALL
 func Execute(ctx context.Context, zapLoggger *zap.Logger, loggerOpt ...log.Opt) {
 	assert.Must(zapLoggger != nil, "no logger setup !!! ").Panic()
 	logger = log.NewTaggedClassicLogger(zapLoggger, "bootloader", loggerOpt...)
@@ -54,7 +73,7 @@ func Execute(ctx context.Context, zapLoggger *zap.Logger, loggerOpt ...log.Opt) 
 		for taskStack.Len() != 0 {
 			item := taskStack.Front()
 			taskStack.Remove(item)
-			taskItem := item.Value.(*task)
+			taskItem := item.Value.(*_UnitTask)
 			taskItem.Cancel()
 			taskItem.Wait()
 		}
@@ -64,7 +83,7 @@ func Execute(ctx context.Context, zapLoggger *zap.Logger, loggerOpt ...log.Opt) 
 		logger.With(
 			log.UseSubTag(log.NewFixStyleText(unitItem.Name, log.Green, true))).
 			Info("start init...")
-		task, err := taskWrapper(ctx, unitItem.Func)
+		task, err := taskWrapper(ctx, zapLoggger, unitItem)
 		if err != nil {
 			logger.With(
 				log.UseSubTag(log.NewFixStyleText(unitItem.Name, log.Red, true))).
@@ -105,7 +124,7 @@ func Execute(ctx context.Context, zapLoggger *zap.Logger, loggerOpt ...log.Opt) 
 	<-ctx.Done()
 }
 
-type task struct {
+type _UnitTask struct {
 	ctx        context.Context
 	cancel     context.CancelFunc
 	originTask ExecFunc
@@ -113,11 +132,11 @@ type task struct {
 	closeOnce  uint32
 }
 
-func (this *task) HasTask() bool {
+func (this *_UnitTask) HasTask() bool {
 	return this.originTask != nil
 }
 
-func (this *task) Exec() ExitResult {
+func (this *_UnitTask) Exec() ExitResult {
 	defer func() {
 		if this.done != nil && atomic.CompareAndSwapUint32(&this.closeOnce, 0, 1) {
 			close(this.done)
@@ -130,31 +149,32 @@ func (this *task) Exec() ExitResult {
 	return this.originTask()
 }
 
-func (this *task) Wait() {
+func (this *_UnitTask) Wait() {
 	<-this.done
 }
 
-func (this *task) Cancel() {
+func (this *_UnitTask) Cancel() {
 	this.cancel()
 }
 
 func taskWrapper(
 	ctx context.Context,
-	initFunc InitFunc) (*task, error) {
+	zlogger *zap.Logger,
+	u Unit) (*_UnitTask, error) {
 	child, cancelFunc := context.WithCancel(ctx)
-	originalExecFunc, err := initFunc(child)
+	originalExecFunc, err := u.Func(child, u.Name, zlogger)
 	if err != nil {
 		cancelFunc()
 		return nil, err
 	}
 	if originalExecFunc == nil {
-		return &task{
+		return &_UnitTask{
 			ctx:    child,
 			cancel: cancelFunc,
 			done:   make(chan struct{}),
 		}, nil
 	}
-	wrap := &task{
+	wrap := &_UnitTask{
 		ctx:        child,
 		cancel:     cancelFunc,
 		originTask: originalExecFunc,
